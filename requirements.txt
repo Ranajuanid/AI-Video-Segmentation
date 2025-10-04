@@ -1,5 +1,5 @@
-flask
-werkzeug
+Flask
+Werkzeug
 python-dotenv
 google-generativeai
-gunicorn
+requests
