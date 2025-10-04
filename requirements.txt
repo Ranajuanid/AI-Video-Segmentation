@@ -58,7 +58,7 @@ gunicorn==23.0.0
 hangul-romanize==0.1.0
 huggingface-hub==0.35.3
 idna==3.4
-imagecodecs==2025.4.2
+imagecodecs
 imageio==2.31.1
 imageio-ffmpeg==0.4.10
 importlib_metadata==6.8.0
