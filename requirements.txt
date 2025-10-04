@@ -162,7 +162,7 @@ typeguard==4.4.4
 typer==0.19.2
 typing-inspection==0.4.2
 typing-extensions==4.15.0
-tzdata==2025.9
+tzdata==2025.2
 tzlocal==5.3.1
 umap-learn==0.5.7
 Unidecode==1.4.0
@@ -175,6 +175,7 @@ wrapt==1.17.3
 yarl==1.20.1
 zipp==3.17.0
 zstandard==0.25.0
+
 
 
 
