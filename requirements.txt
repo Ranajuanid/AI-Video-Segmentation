@@ -60,7 +60,7 @@ huggingface-hub==0.35.3
 idna==3.4
 imagecodecs>=2025.8.2
 imageio==2.31.1
-imageio-ffmpeg==0.4.10
+imageio-ffmpeg>=0.5.0
 importlib_metadata==6.8.0
 inflect==7.5.0
 itsdangerous==2.2.0
@@ -175,6 +175,7 @@ wrapt==1.17.3
 yarl==1.20.1
 zipp==3.17.0
 zstandard==0.25.0
+
 
 
 
