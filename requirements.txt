@@ -2,38 +2,13 @@ flask
 werkzeug
 python-dotenv
 google-generativeai
-google-ai-generativelanguage
-google-api-core
-google-auth
-grpcio
-grpcio-status
-huggingface-hub
-torch
-torchaudio
-transformers
-openai-whisper
-TTS
-numpy
-scipy
-pandas
-matplotlib
-moviepy
-imageio
-imageio-ffmpeg
-tqdm
-pydub
-librosa
-soundfile
-scikit-learn
-scikit-image
-pillow
-regex
-pytz
-tzdata
-tzlocal
-requests
-urllib3
-Cython
-joblib
-typing-extensions
-dataclasses
+uuid
+subprocess32   # optional, for improved subprocess handling on some OSes
+zipfile36      # optional if Python <3.8, else built-in
+threading      # built-in
+shutil         # built-in
+os             # built-in
+datetime       # built-in
+json           # built-in
+time           # built-in
+concurrent.futures  # built-in
