@@ -1,5 +1,12 @@
-Flask
-Werkzeug
+flask
+werkzeug
+gunicorn
 python-dotenv
 google-generativeai
+ffmpeg-python
+pydub
+numpy
+scipy
+moviepy
 requests
+tqdm
