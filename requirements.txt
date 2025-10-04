@@ -2,13 +2,3 @@ flask
 werkzeug
 python-dotenv
 google-generativeai
-uuid
-subprocess32   # optional, for improved subprocess handling on some OSes
-zipfile36      # optional if Python <3.8, else built-in
-threading      # built-in
-shutil         # built-in
-os             # built-in
-datetime       # built-in
-json           # built-in
-time           # built-in
-concurrent.futures  # built-in
