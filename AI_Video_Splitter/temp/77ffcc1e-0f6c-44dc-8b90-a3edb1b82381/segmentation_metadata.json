@@ -1,0 +1,17 @@
+{
+  "original_video": "urdu_dubbed_1.mp4",
+  "total_duration": 151.833333,
+  "segment_count": 2,
+  "ai_analysis": {
+    "video_title": "Your Video Content",
+    "segments": [
+      "Part 1: Engaging Content",
+      "Part 2: Engaging Content"
+    ],
+    "strategy": "Optimal 2-minute segments for viewer engagement",
+    "description": "Video content ready for segmentation"
+  },
+  "segments_metadata": [],
+  "processing_time": "2025-10-04T17:07:58.624682",
+  "ai_generated": true
+}
