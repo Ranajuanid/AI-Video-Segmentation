@@ -17,7 +17,7 @@ bnunicodenormalizer==0.1.7
 Brotli==1.0.9
 cachetools==6.2.0
 catalogue==2.0.10
-certifi==2025.9.1
+certifi
 cffi==1.15.1
 charset-normalizer==3.3.1
 click==8.3.0
