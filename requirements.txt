@@ -3,6 +3,11 @@ werkzeug
 gunicorn
 python-dotenv
 google-generativeai
+google-auth
+google-auth-oauthlib
+google-auth-httplib2
+google-api-python-client
+
 ffmpeg-python
 pydub
 numpy
@@ -10,3 +15,4 @@ scipy
 moviepy
 requests
 tqdm
+
