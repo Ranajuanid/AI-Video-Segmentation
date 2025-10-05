@@ -1,129 +1,115 @@
-from flask import Flask, render_template, request, send_file, jsonify, session, redirect, url_for
+from flask import Flask, render_template, request, jsonify, redirect, url_for
 from werkzeug.utils import secure_filename
-import os
-import uuid
-import subprocess
-import zipfile
+import os, uuid, subprocess, zipfile, shutil, json
+from datetime import datetime
 from dotenv import load_dotenv
-import shutil
 
-# Load env variables
+# Google Drive
+from google.oauth2.credentials import Credentials
+from google_auth_oauthlib.flow import InstalledAppFlow
+from googleapiclient.discovery import build
+from googleapiclient.http import MediaFileUpload
+
+# Load environment
 load_dotenv()
 
 app = Flask(__name__)
-app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'dev-secret-key')
-app.config['MAX_CONTENT_LENGTH'] = 1 * 1024 * 1024 * 1024  # 1GB
+app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'dev-key')
 app.config['UPLOAD_FOLDER'] = 'uploads'
 app.config['TEMP_FOLDER'] = 'temp'
+app.config['MAX_CONTENT_LENGTH'] = 1 * 1024 * 1024 * 1024  # 1GB limit
 
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 os.makedirs(app.config['TEMP_FOLDER'], exist_ok=True)
 
-ALLOWED_EXTENSIONS = {'mp4', 'avi', 'mov', 'mkv', 'wmv', 'flv', 'webm', 'm4v'}
+# Google Drive OAuth
+SCOPES = ["https://www.googleapis.com/auth/drive.file"]
+CREDENTIALS_FILE = "credentials.json"
+TOKEN_FILE = "token.json"
 
-# ---------------- HELPERS ---------------- #
+def get_drive_service():
+    creds = None
+    if os.path.exists(TOKEN_FILE):
+        creds = Credentials.from_authorized_user_file(TOKEN_FILE, SCOPES)
+    if not creds or not creds.valid:
+        if creds and creds.expired and creds.refresh_token:
+            creds.refresh(Request())
+        else:
+            flow = InstalledAppFlow.from_client_secrets_file(CREDENTIALS_FILE, SCOPES)
+            creds = flow.run_local_server(port=0)
+        with open(TOKEN_FILE, "w") as token:
+            token.write(creds.to_json())
+    return build("drive", "v3", credentials=creds)
+
 def allowed_file(filename):
-    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in \
+           {'mp4', 'avi', 'mov', 'mkv', 'wmv', 'flv', 'webm', 'm4v'}
 
-def get_video_duration(input_path):
-    """Get total duration of video in seconds using ffprobe"""
-    cmd = [
-        'ffprobe', '-v', 'error', '-show_entries',
-        'format=duration', '-of',
-        'default=noprint_wrappers=1:nokey=1', input_path
+def split_video(file_path, output_folder, duration=10):
+    """Use ffmpeg to split video"""
+    os.makedirs(output_folder, exist_ok=True)
+    command = [
+        "ffmpeg", "-i", file_path, "-c", "copy", "-map", "0",
+        "-segment_time", str(duration), "-f", "segment",
+        os.path.join(output_folder, "part_%03d.mp4")
     ]
-    result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
-    try:
-        return float(result.stdout.strip())
-    except:
-        return 0.0
+    subprocess.run(command, check=True)
 
-def split_video(input_path, output_dir, segment_duration=120):
-    os.makedirs(output_dir, exist_ok=True)
-    cmd = [
-        'ffmpeg', '-i', input_path,
-        '-c', 'copy', '-map', '0',
-        '-segment_time', str(segment_duration),
-        '-f', 'segment', '-reset_timestamps', '1',
-        os.path.join(output_dir, 'segment_%03d.mp4')
-    ]
-    result = subprocess.run(cmd, capture_output=True, text=True)
-    return result.returncode == 0
-
-def create_zip(source_dir, zip_path):
-    with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
-        for root, dirs, files in os.walk(source_dir):
-            for file in files:
-                zipf.write(os.path.join(root, file), file)
-    return True
-
-# ---------------- ROUTES ---------------- #
 @app.route('/')
 def index():
     return render_template("index.html")
 
 @app.route('/upload', methods=['POST'])
-def upload_video():
-    if 'video' not in request.files:
-        return jsonify({'error': 'No file uploaded'}), 400
-    file = request.files['video']
-    if file.filename == '' or not allowed_file(file.filename):
-        return jsonify({'error': 'Invalid file'}), 400
+def upload():
+    if 'file' not in request.files:
+        return jsonify({"error": "No file"}), 400
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({"error": "Empty filename"}), 400
+    if file and allowed_file(file.filename):
+        filename = secure_filename(file.filename)
+        file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+        file.save(file_path)
 
-    session_id = str(uuid.uuid4())
-    upload_path = os.path.join(app.config['UPLOAD_FOLDER'], session_id)
-    os.makedirs(upload_path, exist_ok=True)
+        job_id = str(uuid.uuid4())
+        output_folder = os.path.join(app.config['TEMP_FOLDER'], job_id)
+        zip_path = os.path.join(app.config['TEMP_FOLDER'], f"{job_id}.zip")
 
-    filename = secure_filename(file.filename)
-    file_path = os.path.join(upload_path, filename)
-    file.save(file_path)
+        try:
+            split_video(file_path, output_folder, duration=30)
 
-    # ---- get video duration (seconds) ----
-    try:
-        result = subprocess.run(
-            ['ffprobe', '-v', 'error', '-show_entries',
-             'format=duration', '-of',
-             'default=noprint_wrappers=1:nokey=1', file_path],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True
-        )
-        total_duration = float(result.stdout.strip())
-    except Exception:
-        total_duration = 0.0
+            # Zip the parts
+            with zipfile.ZipFile(zip_path, 'w') as zipf:
+                for root, _, files in os.walk(output_folder):
+                    for f in files:
+                        zipf.write(os.path.join(root, f), arcname=f)
 
-    # ---- split video ----
-    segments_dir = os.path.join(app.config['TEMP_FOLDER'], session_id)
-    success = split_video(file_path, segments_dir)
-    if not success:
-        return jsonify({'error': 'Video processing failed'}), 500
+            # Upload to Google Drive
+            service = get_drive_service()
+            file_metadata = {"name": f"{job_id}.zip", "mimeType": "application/zip"}
+            media = MediaFileUpload(zip_path, mimetype="application/zip", resumable=True)
+            uploaded = service.files().create(body=file_metadata, media_body=media, fields="id, webViewLink").execute()
 
-    # ---- count segments ----
-    segments = [f for f in os.listdir(segments_dir) if f.endswith(".mp4")]
-    num_segments = len(segments)
+            # Make file public
+            service.permissions().create(
+                fileId=uploaded.get("id"),
+                body={"role": "reader", "type": "anyone"}
+            ).execute()
 
-    # ---- zip ----
-    zip_filename = f"segments_{session_id}.zip"
-    zip_path = os.path.join(app.config['TEMP_FOLDER'], zip_filename)
-    create_zip(segments_dir, zip_path)
+            drive_link = f"https://drive.google.com/uc?id={uploaded.get('id')}&export=download"
 
-    # ---- convert duration to minutes ----
-    total_duration_minutes = round(total_duration / 60, 2)
+            # Cleanup
+            shutil.rmtree(output_folder)
+            os.remove(file_path)
+            os.remove(zip_path)
 
-    return jsonify({
-        "success": True,
-        "segments": num_segments,              # ✅ now defined
-        "duration": total_duration_minutes,    # ✅ now defined
-        "zip_file": zip_filename
-    })
+            return jsonify({"success": True, "download_link": drive_link})
 
-@app.route('/download/<filename>')
-def download_file(filename):
-    file_path = os.path.join(app.config['TEMP_FOLDER'], filename)
-    if os.path.exists(file_path):
-        return send_file(file_path, as_attachment=True)
-    return jsonify({'error': 'File not found'}), 404
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+    else:
+        return jsonify({"error": "Invalid file format"}), 400
 
 if __name__ == "__main__":
-    print("🚀 Running AI Video Splitter")
-    app.run(debug=True, host="0.0.0.0", port=5000)
+    print("🚀 AI Video Splitter with Google Drive ready!")
+    app.run(host="0.0.0.0", port=5000, debug=True)
