@@ -16,7 +16,8 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <!-- Google Adsense -->
-    <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-XXXXXXXXXXXXXXXX" crossorigin="anonymous"></script>
+    <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-5466268045943633"
+     crossorigin="anonymous"></script>
     <!-- PWA Manifest -->
     <link rel="manifest" href="manifest.json">
     <style>
@@ -1685,7 +1686,7 @@
             validateFile(file) {
                 // Check file size (1GB limit)
                 if (file.size > 1024 * 1024 * 1024) {
-                    this.showToast('File size must be less than 1GB', 'error');
+                    this.showToast('File size must be less than 100MBs', 'error');
                     return false;
                 }
 
@@ -1823,7 +1824,7 @@
 
                     if (data.success) {
                         this.updateProgress(100, '🎉 Processing complete!');
-                        setTimeout(() => this.showResults(data), 1000);
+                        setTimeout(() => this.showResults(data), 5000);
                     } else {
                         throw new Error(data.error || 'Processing failed');
                     }
@@ -1974,3 +1975,4 @@
     </script>
 </body>
 </html>
+
