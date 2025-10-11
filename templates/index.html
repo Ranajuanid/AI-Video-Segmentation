@@ -7,7 +7,6 @@
       window.dataLayer = window.dataLayer || [];
       function gtag(){dataLayer.push(arguments);}
       gtag('js', new Date());
-
       gtag('config', 'G-EZVH7CN7ZG');
     </script>
     
@@ -699,7 +698,6 @@
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
             gap: 2rem;
-
             margin-bottom: 3rem;
         }
         #legal-page .main-content {
@@ -1547,13 +1545,30 @@
                 document.querySelector('.nav-links').classList.remove('active');
             }
         }
-        
+
         class VideoSplitter {
             constructor() {
                 this.initializeEventListeners();
                 this.setupDragAndDrop();
                 this.setupScrollAnimations();
                 this.setupTheme();
+                this.s3Enabled = false;
+                this.checkS3Status();
+            }
+
+            async checkS3Status() {
+                try {
+                    const response = await fetch('/api/status');
+                    const data = await response.json();
+                    this.s3Enabled = data.s3_enabled;
+                    if (this.s3Enabled) {
+                        console.log('✅ S3 storage enabled - large file support available');
+                    } else {
+                        console.log('⚠️ S3 storage not available - using local processing');
+                    }
+                } catch (error) {
+                    console.log('⚠️ Could not check S3 status');
+                }
             }
 
             initializeEventListeners() {
@@ -1658,7 +1673,13 @@
                 this.showFileInfo(file);
 
                 // Start upload and processing
-                await this.uploadAndProcess(file);
+                if (this.s3Enabled && file.size > 25 * 1024 * 1024) {
+                    // Use S3 for files larger than 25MB
+                    await this.uploadAndProcessS3(file);
+                } else {
+                    // Use local processing for smaller files
+                    await this.uploadAndProcessLocal(file);
+                }
             }
 
             validateFile(file) {
@@ -1686,15 +1707,85 @@
             showFileInfo(file) {
                 const fileInfo = document.getElementById('fileInfo');
                 const fileSize = (file.size / (1024 * 1024)).toFixed(2);
+                const method = this.s3Enabled && file.size > 25 * 1024 * 1024 ? '☁️ Cloud Upload' : '⚡ Direct Processing';
                 
                 fileInfo.innerHTML = `
                     <h4>📹 ${file.name}</h4>
                     <p>📊 Size: ${fileSize} MB | 🎬 Type: ${file.type}</p>
+                    <p>🚀 Method: ${method}</p>
                 `;
                 fileInfo.style.display = 'block';
             }
 
-            async uploadAndProcess(file) {
+            async uploadAndProcessS3(file) {
+                this.showProgress();
+                this.updateProgress(5, '🔄 Preparing cloud upload...');
+
+                try {
+                    // Step 1: Get presigned URL
+                    this.updateProgress(10, '🔗 Getting upload URL...');
+                    const presignedResponse = await fetch('/generate_presigned_url', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            filename: file.name
+                        })
+                    });
+
+                    const presignedData = await presignedResponse.json();
+
+                    if (!presignedData.presigned_url) {
+                        throw new Error(presignedData.error || 'Failed to get upload URL');
+                    }
+
+                    // Step 2: Upload directly to S3
+                    this.updateProgress(20, '☁️ Uploading to cloud storage...');
+                    
+                    const uploadResponse = await fetch(presignedData.presigned_url, {
+                        method: 'PUT',
+                        body: file,
+                        headers: {
+                            'Content-Type': file.type
+                        }
+                    });
+
+                    if (!uploadResponse.ok) {
+                        throw new Error('Cloud upload failed');
+                    }
+
+                    // Step 3: Start processing
+                    this.updateProgress(40, '🤖 Starting AI analysis...');
+                    
+                    const processResponse = await fetch('/process_video', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            object_name: presignedData.object_name,
+                            session_id: presignedData.session_id
+                        })
+                    });
+
+                    const processData = await processResponse.json();
+
+                    if (processData.success) {
+                        this.updateProgress(100, '🎉 Processing complete!');
+                        setTimeout(() => this.showResults(processData), 1000);
+                    } else {
+                        throw new Error(processData.error || 'Processing failed');
+                    }
+
+                } catch (error) {
+                    console.error('S3 upload error:', error);
+                    this.showToast('Error processing video: ' + error.message, 'error');
+                    this.resetUI();
+                }
+            }
+
+            async uploadAndProcessLocal(file) {
                 const formData = new FormData();
                 formData.append('video', file);
 
@@ -1754,6 +1845,7 @@
             updateProgress(percent, text) {
                 document.getElementById('progressFill').style.width = percent + '%';
                 document.getElementById('progressText').textContent = text;
+                document.getElementById('progressStatus').textContent = text;
             }
 
             showResults(data) {
@@ -1775,7 +1867,17 @@
                 `;
 
                 const downloadBtn = document.getElementById('downloadBtn');
-                downloadBtn.onclick = () => this.downloadResult(data.zip_filename);
+                
+                if (data.download_url) {
+                    // S3 download
+                    downloadBtn.onclick = () => {
+                        window.open(data.download_url, '_blank');
+                        this.showToast('✅ Download started from cloud storage!', 'success');
+                    };
+                } else {
+                    // Local download
+                    downloadBtn.onclick = () => this.downloadResult(data.zip_filename);
+                }
             }
 
             async downloadResult(filename) {
@@ -1871,7 +1973,4 @@
         });
     </script>
 </body>
-
 </html>
-
-
