@@ -1,5 +1,5 @@
-flask
-werkzeug
+Flask
+Werkzeug
 gunicorn
 python-dotenv
 google-generativeai
@@ -8,11 +8,18 @@ google-auth-oauthlib
 google-auth-httplib2
 google-api-python-client
 
+# Video Processing
 ffmpeg-python
 pydub
 numpy
 scipy
 moviepy
-requests
-tqdm
 
+# AWS S3 & HTTP
+boto3
+requests
+
+# Utilities
+tqdm
+Pillow
+urllib3
